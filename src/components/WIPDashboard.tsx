@@ -381,13 +381,18 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
 
 
                             {/* Data Rows */}
-                            <tbody className="divide-y divide-gray-200">
-                                {wipData.map((job) => (
-                                    <tr key={job.id} className="hover:bg-gray-50">
+                            <tbody>
+                                {wipData.map((job, i) => (
+                                    <tr
+                                        key={job.id}
+                                        className="odd:bg-white even:bg-gray-50 hover:bg-gray-100"
+                                    >
                                         {COLUMNS.map(col => (
                                             <td
                                                 key={`${job.id}-${col.key}`}
-                                                className={`${col.frozen ? 'sticky bg-white hover:bg-gray-50 z-10 border-r border-gray-300' : ''}`}
+                                                className={`${col.frozen
+                                                    ? 'sticky z-10 bg-inherit border-r border-gray-300'
+                                                    : ''}`}
                                                 style={{
                                                     width: col.width,
                                                     minWidth: col.width,
@@ -413,6 +418,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                     </tr>
                                 ))}
                             </tbody>
+
                         </table>
                     </div>
                 </div>
