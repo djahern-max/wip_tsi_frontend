@@ -1,54 +1,39 @@
-// src/components/WIPDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Download, RefreshCw, AlertCircle } from 'lucide-react';
+import { MessageCircle, Save, X, Edit3, RefreshCw, AlertCircle } from 'lucide-react';
 import { WIPSnapshot, CellExplanation, WIPColumn } from '../types/wip';
 import { wipService } from '../services/wipService';
-import { wipAPI, WIPWithTotalsResponse } from '../lib/api'; // Import the new API
+import { wipAPI, WIPWithTotalsResponse } from '../lib/api';
 import { CommentModal } from './CommentModal';
-import WIPTotalsRow from './WIPTotalsRow'; // Import the totals row component
+import WIPTotalsRow from './WIPTotalsRow';
 
-// Column definitions with all 23 data fields
+// Column definitions - same as before
 const COLUMNS: WIPColumn[] = [
-    // System Fields (frozen)
     { key: 'job_number', label: 'Job #', section: 'system', width: '100px', frozen: true },
     { key: 'project_name', label: 'Project Name', section: 'system', width: '300px', frozen: true },
-
-    // Contract Section (5 columns)
     { key: 'current_month_original_contract_amount', label: 'Original Contract', section: 'contract', width: '140px', type: 'currency' },
     { key: 'current_month_change_order_amount', label: 'Change Orders', section: 'contract', width: '130px', type: 'currency' },
     { key: 'current_month_total_contract_amount', label: 'Total Contract', section: 'contract', width: '140px', type: 'currency' },
     { key: 'prior_month_total_contract_amount', label: 'Prior Contract', section: 'contract', width: '130px', type: 'currency' },
     { key: 'current_vs_prior_contract_variance', label: 'Contract Variance', section: 'contract', width: '140px', type: 'currency' },
-
-    // Cost Section (5 columns)
     { key: 'current_month_cost_to_date', label: 'Cost to Date', section: 'cost', width: '130px', type: 'currency' },
     { key: 'current_month_estimated_cost_to_complete', label: 'Est. Cost to Complete', section: 'cost', width: '160px', type: 'currency' },
     { key: 'current_month_estimated_final_cost', label: 'Est. Final Cost', section: 'cost', width: '140px', type: 'currency' },
     { key: 'prior_month_estimated_final_cost', label: 'Prior Final Cost', section: 'cost', width: '140px', type: 'currency' },
     { key: 'current_vs_prior_estimated_final_cost_variance', label: 'Final Cost Variance', section: 'cost', width: '150px', type: 'currency' },
-
-    // US GAAP Section (4 columns)
     { key: 'us_gaap_percent_completion', label: 'GAAP % Complete', section: 'gaap', width: '130px', type: 'percentage' },
     { key: 'revenue_earned_to_date_us_gaap', label: 'Revenue Earned (GAAP)', section: 'gaap', width: '160px', type: 'currency' },
     { key: 'estimated_job_margin_to_date_us_gaap', label: 'Job Margin (GAAP)', section: 'gaap', width: '150px', type: 'currency' },
     { key: 'estimated_job_margin_to_date_percent_sales', label: 'Job Margin %', section: 'gaap', width: '120px', type: 'percentage' },
-
-    // Job Margin Section (4 columns)
     { key: 'current_month_estimated_job_margin_at_completion', label: 'Est. Job Margin', section: 'margin', width: '140px', type: 'currency' },
     { key: 'prior_month_estimated_job_margin_at_completion', label: 'Prior Job Margin', section: 'margin', width: '140px', type: 'currency' },
     { key: 'current_vs_prior_estimated_job_margin', label: 'Job Margin Variance', section: 'margin', width: '150px', type: 'currency' },
     { key: 'current_month_estimated_job_margin_percent_sales', label: 'Job Margin % Sales', section: 'margin', width: '150px', type: 'percentage' },
-
-    // Billing Section (1 column)
     { key: 'current_month_revenue_billed_to_date', label: 'Revenue Billed', section: 'billing', width: '140px', type: 'currency' },
-
-    // WIP Adjustments (3 columns)
     { key: 'current_month_costs_in_excess_billings', label: 'Costs in Excess', section: 'adjustments', width: '140px', type: 'currency' },
     { key: 'current_month_billings_excess_revenue', label: 'Billings in Excess', section: 'adjustments', width: '150px', type: 'currency' },
     { key: 'current_month_addl_entry_required', label: 'Additional Entry', section: 'adjustments', width: '140px', type: 'currency' }
 ];
 
-// Professional section colors for collapsible headers
 const SECTION_COLORS: Record<string, string> = {
     system: 'bg-green-100 text-green-800 border-green-300',
     contract: 'bg-blue-100 text-blue-800 border-blue-300',
@@ -59,84 +44,137 @@ const SECTION_COLORS: Record<string, string> = {
     adjustments: 'bg-red-100 text-red-800 border-red-300'
 };
 
-const getSectionLabel = (section: string, reportDate?: string): string => {
-    const labels: Record<string, string> = {
-        system: reportDate ? `Projects - ${new Date(reportDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : 'Projects',
-        contract: 'Contract Section',
-        cost: 'Cost Section',
-        gaap: 'US GAAP Section',
-        margin: 'Job Margin Section',
-        billing: 'Billing Section',
-        adjustments: 'WIP Adjustments'
-    };
-    return labels[section] || section;
-};
-
-// Formatting functions
-const formatCurrency = (value: number | null | undefined): string => {
-    if (value == null || value === 0) return '';
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value);
-};
-
-const formatPercentage = (value: number | null | undefined): string => {
-    if (value == null) return '';
-    return `${Number(value).toFixed(2)}%`;
-};
-
-const formatValue = (value: any, type?: string): string => {
-    if (type === 'currency') return formatCurrency(value);
-    if (type === 'percentage') return formatPercentage(value);
-    return value || '';
-};
-
-// Field label mapping
-const FIELD_LABELS: Record<string, string> = {
-    current_month_original_contract_amount: 'Original Contract Amount',
-    current_month_change_order_amount: 'Change Order Amount',
-    current_month_total_contract_amount: 'Total Contract Amount',
-    prior_month_total_contract_amount: 'Prior Month Contract',
-    current_vs_prior_contract_variance: 'Contract Variance',
-    current_month_cost_to_date: 'Cost to Date',
-    current_month_estimated_cost_to_complete: 'Estimated Cost to Complete',
-    current_month_estimated_final_cost: 'Estimated Final Cost',
-    prior_month_estimated_final_cost: 'Prior Month Final Cost',
-    current_vs_prior_estimated_final_cost_variance: 'Final Cost Variance',
-    us_gaap_percent_completion: 'US GAAP % Complete',
-    revenue_earned_to_date_us_gaap: 'Revenue Earned (GAAP)',
-    estimated_job_margin_to_date_us_gaap: 'Job Margin (GAAP)',
-    estimated_job_margin_to_date_percent_sales: 'Job Margin %',
-    current_month_estimated_job_margin_at_completion: 'Estimated Job Margin',
-    prior_month_estimated_job_margin_at_completion: 'Prior Job Margin',
-    current_vs_prior_estimated_job_margin: 'Job Margin Variance',
-    current_month_estimated_job_margin_percent_sales: 'Job Margin % of Sales',
-    current_month_revenue_billed_to_date: 'Revenue Billed to Date',
-    current_month_costs_in_excess_billings: 'Costs in Excess of Billings',
-    current_month_billings_excess_revenue: 'Billings in Excess of Revenue',
-    current_month_addl_entry_required: 'Additional Entry Required'
-};
-
-interface TableCellProps {
+interface EditableTableCellProps {
     value: any;
     type?: string;
     jobNumber: string;
+    wipId: number;
     field: keyof WIPSnapshot;
+    isAdmin: boolean;
+    onSave: (wipId: number, field: keyof WIPSnapshot, value: any) => Promise<void>;
     hasComment?: string;
     onAddComment: (jobNumber: string, field: keyof WIPSnapshot, value: string) => void;
 }
 
-const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, hasComment, onAddComment }) => {
+const EditableTableCell: React.FC<EditableTableCellProps> = ({
+    value, type, jobNumber, wipId, field, isAdmin, onSave, hasComment, onAddComment
+}) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const formatCurrency = (amount: number | null | undefined): string => {
+        if (amount == null || amount === 0) return '';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    };
+
+    const formatPercentage = (percent: number | null | undefined): string => {
+        if (percent == null) return '';
+        return `${Number(percent).toFixed(2)}%`;
+    };
+
+    const formatValue = (val: any, type?: string): string => {
+        if (type === 'currency') return formatCurrency(val);
+        if (type === 'percentage') return formatPercentage(val);
+        return val || '';
+    };
+
     const formattedValue = formatValue(value, type);
+
+    const handleEdit = () => {
+        if (!isAdmin || field === 'job_number' || field === 'project_name') return;
+        setEditValue(value?.toString() || '');
+        setIsEditing(true);
+    };
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            let parsedValue: any = editValue;
+
+            // Parse based on type
+            if (type === 'currency' || type === 'percentage') {
+                // Remove currency symbols and commas, parse as number
+                const cleanValue = editValue.replace(/[$,%]/g, '');
+                parsedValue = cleanValue ? parseFloat(cleanValue) : null;
+            }
+
+            await onSave(wipId, field, parsedValue);
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Error saving value:', error);
+            alert('Failed to save value');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
+        setIsEditing(false);
+        setEditValue('');
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSave();
+        } else if (e.key === 'Escape') {
+            handleCancel();
+        }
+    };
+
+    if (field === 'job_number' || field === 'project_name') {
+        return (
+            <div className="p-2 text-sm font-medium text-gray-900 border-r border-gray-200">
+                {field === 'job_number' ? value : value}
+            </div>
+        );
+    }
 
     return (
         <div className="group relative">
-            <div className="p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50">
-                {formattedValue}
-            </div>
+            {isEditing ? (
+                <div className="flex items-center p-1 border-r border-gray-200 bg-yellow-50">
+                    <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        className="w-full text-right text-sm border border-blue-300 rounded px-1 py-1 focus:outline-none focus:border-blue-500"
+                        placeholder={type === 'currency' ? '0.00' : type === 'percentage' ? '0.00' : ''}
+                        autoFocus
+                    />
+                    <div className="flex ml-1 space-x-1">
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="p-1 text-green-600 hover:bg-green-100 rounded"
+                            title="Save"
+                        >
+                            {isSaving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded"
+                            title="Cancel"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className={`p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50 ${isAdmin ? 'cursor-pointer' : ''}`} onClick={handleEdit}>
+                    {formattedValue}
+                    {isAdmin && (
+                        <Edit3 size={12} className="ml-1 opacity-0 group-hover:opacity-50 text-blue-500" />
+                    )}
+                </div>
+            )}
+
+            {/* Comment button */}
             <button
                 onClick={() => onAddComment(jobNumber, field, formattedValue)}
                 className={`absolute top-1 right-1 p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 ${hasComment
@@ -147,6 +185,7 @@ const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, ha
             >
                 <MessageCircle size={12} />
             </button>
+
             {hasComment && (
                 <div className="absolute z-10 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
                     {hasComment}
@@ -156,18 +195,20 @@ const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, ha
     );
 };
 
-interface WIPDashboardProps {
+interface EditableWIPDashboardProps {
     onReportDateUpdate?: (date: string) => void;
+    currentUser: { role: 'admin' | 'viewer' };
 }
 
-export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }) => {
-    // Updated state to include totals
+export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onReportDateUpdate, currentUser }) => {
     const [wipData, setWipData] = useState<WIPSnapshot[]>([]);
     const [wipTotals, setWipTotals] = useState<any>(null);
     const [explanations, setExplanations] = useState<Record<string, CellExplanation[]>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [reportDate, setReportDate] = useState<string>('2025-07-31');
+
+    const isAdmin = currentUser.role === 'admin';
 
     // Comment modal state
     const [commentModal, setCommentModal] = useState<{
@@ -185,7 +226,6 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
         value: ''
     });
 
-    // Load data on mount
     useEffect(() => {
         loadWIPData();
     }, []);
@@ -195,22 +235,19 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
             setLoading(true);
             setError(null);
 
-            // Use the new API endpoint that includes totals
             const response: WIPWithTotalsResponse = await wipAPI.latestWithTotals();
 
             setWipData(response.snapshots);
             setWipTotals(response.totals);
 
-            // Set report date from response
             if (response.report_date) {
                 setReportDate(response.report_date);
-                // Notify parent component of report date
                 if (onReportDateUpdate) {
                     onReportDateUpdate(response.report_date);
                 }
             }
 
-            // Load explanations for each WIP snapshot
+            // Load explanations
             const explanationsMap: Record<string, CellExplanation[]> = {};
             for (const wip of response.snapshots) {
                 try {
@@ -224,18 +261,23 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load WIP data');
-            console.error('Error loading WIP data:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleExport = async () => {
+    const handleSaveCell = async (wipId: number, field: keyof WIPSnapshot, value: any) => {
         try {
-            await wipService.downloadExcel();
-        } catch (err) {
-            console.error("Export failed:", err);
-            alert("Export failed: " + (err instanceof Error ? err.message : "Unknown error"));
+            // Call API to update the specific field
+            const updateData: Partial<WIPSnapshot> = { [field]: value } as Partial<WIPSnapshot>;
+            await wipAPI.update(wipId, updateData);
+
+            // Reload data to get updated totals
+            await loadWIPData();
+
+        } catch (error) {
+            console.error('Error updating cell:', error);
+            throw error;
         }
     };
 
@@ -262,21 +304,18 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
 
         try {
             if (commentModal.existingCommentId) {
-                // Update existing comment
                 await wipService.updateExplanation(
                     commentModal.wipSnapshotId,
                     commentModal.existingCommentId,
                     { explanation: comment }
                 );
             } else {
-                // Create new comment
                 await wipService.createExplanation(commentModal.wipSnapshotId, {
                     field_name: commentModal.field,
                     explanation: comment
                 });
             }
 
-            // Reload explanations
             const updatedExplanations = await wipService.getExplanations(commentModal.wipSnapshotId);
             setExplanations(prev => ({
                 ...prev,
@@ -301,13 +340,27 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
         return acc;
     }, {} as Record<string, WIPColumn[]>);
 
-    const formatReportDate = (dateString: string): string => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+    const getSectionLabel = (section: string, reportDate?: string): string => {
+        const labels: Record<string, string> = {
+            system: reportDate ? `Projects - ${new Date(reportDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : 'Projects',
+            contract: 'Contract Section',
+            cost: 'Cost Section',
+            gaap: 'US GAAP Section',
+            margin: 'Job Margin Section',
+            billing: 'Billing Section',
+            adjustments: 'WIP Adjustments'
+        };
+        return labels[section] || section;
+    };
+
+    const formatCurrency = (amount: number | null | undefined): string => {
+        if (amount === null || amount === undefined) return 'N/A';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(amount);
     };
 
     if (loading) {
@@ -341,6 +394,16 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
     return (
         <div className="bg-gray-50">
             <div className="w-full px-4 py-4">
+                {/* Admin Notice */}
+                {isAdmin && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                        <div className="flex items-center text-blue-800">
+                            <Edit3 className="mr-2" size={16} />
+                            <span className="font-medium">Admin Mode: Click any cell to edit values directly</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Summary Header */}
                 {wipTotals && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 p-4">
@@ -371,43 +434,47 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                     </div>
                 )}
 
-                {/* Table Container with Sticky Headers */}
+                {/* Table Container */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                     <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
                         <table className="w-full border-separate border-spacing-0">
-                            {/* Section Headers - Sticky row #1 */}
+                            {/* Headers */}
                             <thead className="sticky top-0 z-30">
-                                <tr className="h-10">{Object.entries(groupedColumns).map(([section, cols]) => (
-                                    <th
-                                        key={section}
-                                        colSpan={cols.length}
-                                        className={[
-                                            "sticky top-0 px-4 text-left text-[13px] font-bold uppercase tracking-wider",
-                                            "shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
-                                            SECTION_COLORS[section],
-                                        ].join(" ")}
-                                    >
-                                        {getSectionLabel(section, section === 'system' ? reportDate : undefined)}
-                                    </th>
-                                ))}</tr>
+                                <tr className="h-10">
+                                    {Object.entries(groupedColumns).map(([section, cols]) => (
+                                        <th
+                                            key={section}
+                                            colSpan={cols.length}
+                                            className={[
+                                                "sticky top-0 px-4 text-left text-[13px] font-bold uppercase tracking-wider",
+                                                "shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
+                                                SECTION_COLORS[section],
+                                            ].join(" ")}
+                                        >
+                                            {getSectionLabel(section, section === 'system' ? reportDate : undefined)}
+                                        </th>
+                                    ))}
+                                </tr>
 
-                                <tr className="sticky top-10 z-30 bg-gray-100 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] h-12">{COLUMNS.map(col => (
-                                    <th
-                                        key={col.key}
-                                        className={[
-                                            "px-2 text-left text-[11px] font-bold text-gray-800 uppercase tracking-wider",
-                                            "border-r border-gray-300",
-                                            col.frozen ? "sticky left-0 z-40 bg-gray-100" : "bg-gray-100",
-                                        ].join(" ")}
-                                        style={{
-                                            width: col.width,
-                                            minWidth: col.width,
-                                            ...(col.frozen && { left: col.key === 'job_number' ? 0 : '100px' }),
-                                        }}
-                                    >
-                                        {col.label}
-                                    </th>
-                                ))}</tr>
+                                <tr className="sticky top-10 z-30 bg-gray-100 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] h-12">
+                                    {COLUMNS.map(col => (
+                                        <th
+                                            key={col.key}
+                                            className={[
+                                                "px-2 text-left text-[11px] font-bold text-gray-800 uppercase tracking-wider",
+                                                "border-r border-gray-300",
+                                                col.frozen ? "sticky left-0 z-40 bg-gray-100" : "bg-gray-100",
+                                            ].join(" ")}
+                                            style={{
+                                                width: col.width,
+                                                minWidth: col.width,
+                                                ...(col.frozen && { left: col.key === 'job_number' ? 0 : '100px' }),
+                                            }}
+                                        >
+                                            {col.label}
+                                        </th>
+                                    ))}
+                                </tr>
                             </thead>
 
                             {/* Data Rows */}
@@ -429,20 +496,17 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                                     ...(col.frozen && { left: col.key === 'job_number' ? 0 : '100px' })
                                                 }}
                                             >
-                                                {col.key === 'job_number' || col.key === 'project_name' ? (
-                                                    <div className="p-2 text-sm font-medium text-gray-900 border-r border-gray-200">
-                                                        {job[col.key]}
-                                                    </div>
-                                                ) : (
-                                                    <TableCell
-                                                        value={job[col.key]}
-                                                        type={col.type}
-                                                        jobNumber={job.job_number}
-                                                        field={col.key}
-                                                        hasComment={getComment(job.id, col.key)}
-                                                        onAddComment={handleAddComment}
-                                                    />
-                                                )}
+                                                <EditableTableCell
+                                                    value={job[col.key]}
+                                                    type={col.type}
+                                                    jobNumber={job.job_number}
+                                                    wipId={job.id}
+                                                    field={col.key}
+                                                    isAdmin={isAdmin}
+                                                    onSave={handleSaveCell}
+                                                    hasComment={getComment(job.id, col.key)}
+                                                    onAddComment={handleAddComment}
+                                                />
                                             </td>
                                         ))}
                                     </tr>
@@ -461,7 +525,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                 isOpen={commentModal.isOpen}
                 onClose={() => setCommentModal(prev => ({ ...prev, isOpen: false }))}
                 jobNumber={commentModal.jobNumber}
-                fieldLabel={FIELD_LABELS[commentModal.field] || commentModal.field}
+                fieldLabel={commentModal.field}
                 fieldValue={commentModal.value}
                 existingComment={commentModal.existingComment}
                 onSave={handleSaveComment}

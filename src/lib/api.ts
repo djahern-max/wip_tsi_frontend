@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// API Configuration - use /api for production (goes through nginx proxy)
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+// API Configuration - use direct backend URL for local development
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? '/api'  // Use proxy in production
+    : 'http://localhost:8000';  // Direct backend URL in development
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -11,7 +13,7 @@ export const apiClient = axios.create({
     },
 });
 
-// Types
+// Rest of your existing types and code stays the same...
 export interface User {
     id: number;
     username: string;
@@ -102,6 +104,50 @@ export interface WIPDashboardSummary {
     report_date: string;
 }
 
+// NEW: WIP Totals interfaces
+export interface WIPTotals {
+    // Contract section
+    total_original_contract: number;
+    total_change_orders: number;
+    total_contract: number;
+    total_prior_contract: number;
+    contract_variance: number;
+
+    // Cost section
+    total_cost_to_date: number;
+    total_est_cost_complete: number;
+    total_estimated_final_cost: number;
+    total_prior_final_cost: number;
+    final_cost_variance: number;
+
+    // Percentages (weighted averages)
+    avg_us_gaap_completion: number;
+
+    // Revenue section
+    total_billed_to_date: number;
+    total_revenue_earned: number;
+
+    // Job margin section
+    total_job_margin: number;
+    total_prior_job_margin: number;
+    job_margin_variance: number;
+    avg_job_margin_percent: number;
+
+    // WIP adjustments
+    total_costs_excess_billings: number;
+    total_billings_excess_revenue: number;
+
+    // Summary stats
+    total_projects: number;
+    overall_margin_percent: number;
+}
+
+export interface WIPWithTotalsResponse {
+    snapshots: WIPSnapshot[];
+    totals: WIPTotals;
+    report_date: string | null;
+}
+
 // Auth token management - FIXED to use access_token
 let authToken: string | null = localStorage.getItem('access_token');
 
@@ -163,6 +209,17 @@ export const wipAPI = {
         return response.data;
     },
 
+    latestWithTotals: async (): Promise<WIPWithTotalsResponse> => {
+        const response = await apiClient.get('/wip/latest/with-totals');
+        return response.data;
+    },
+
+    // ADD THIS NEW METHOD:
+    update: async (wipId: number, updateData: Partial<WIPSnapshot>): Promise<WIPSnapshot> => {
+        const response = await apiClient.put(`/wip/${wipId}`, updateData);
+        return response.data;
+    },
+
     get: async (id: number): Promise<WIPSnapshot> => {
         const response = await apiClient.get(`/wip/${id}`);
         return response.data;
@@ -206,4 +263,11 @@ export const getChangeIndicator = (current: number | null | undefined, previous:
         isIncrease: change > 0,
         isDecrease: change < 0,
     };
+};
+
+// NEW: Utility function for variance styling
+export const getVarianceClass = (variance: number): string => {
+    if (variance > 0) return 'text-green-600 font-medium';
+    if (variance < 0) return 'text-red-600 font-medium';
+    return 'text-gray-600';
 };

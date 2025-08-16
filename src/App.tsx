@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
-import { WIPDashboard } from './components/WIPDashboard';
+import { EditableWIPDashboard } from './components/EditableWIPDashboard'; // Changed import
 import { Header } from './components/Header';
 import { wipService } from './services/wipService';
 
@@ -82,8 +82,11 @@ function App() {
         onLogout={handleLogout}
       />
 
-      {/* WIP Dashboard */}
-      <WIPDashboard key={dashboardKey} />
+      {/* Editable WIP Dashboard */}
+      <EditableWIPDashboard
+        key={dashboardKey}
+        currentUser={user} // Pass the current user
+      />
     </div>
   );
 }
