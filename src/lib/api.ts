@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// API Configuration - use /api for production (goes through nginx proxy)
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -108,11 +108,11 @@ let authToken: string | null = localStorage.getItem('access_token');
 export const setAuthToken = (token: string | null) => {
     authToken = token;
     if (token) {
-        localStorage.setItem('access_token', token);  // ✅ 
-        // ...
+        localStorage.setItem('access_token', token);
+        apiClient.defaults.headers.Authorization = `Bearer ${token}`;
     } else {
-        localStorage.removeItem('access_token');  // ✅
-        // ...
+        localStorage.removeItem('access_token');
+        delete apiClient.defaults.headers.Authorization;
     }
 };
 

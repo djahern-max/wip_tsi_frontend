@@ -212,6 +212,16 @@ export const WIPDashboard: React.FC = () => {
         }
     };
 
+
+    const handleExport = async () => {
+        try {
+            await wipService.downloadExcel();
+        } catch (err) {
+            console.error("Export failed:", err);
+            alert("Export failed: " + (err instanceof Error ? err.message : "Unknown error"));
+        }
+    };
+
     const handleAddComment = (jobNumber: string, field: keyof WIPSnapshot, value: string) => {
         const wip = wipData.find(w => w.job_number === jobNumber);
         if (!wip) return;
@@ -331,7 +341,7 @@ export const WIPDashboard: React.FC = () => {
                                 <RefreshCw size={16} />
                                 Refresh
                             </button>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
+<button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
                                 <Download size={16} />
                                 Export
                             </button>

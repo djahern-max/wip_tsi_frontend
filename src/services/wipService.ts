@@ -1,7 +1,7 @@
 // src/services/wipService.ts
 import { WIPSnapshot, CellExplanation, ExplanationCreate, ExplanationUpdate, ApiResponse } from '../types/wip';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
 class WIPService {
     private getAuthHeaders(): HeadersInit {
@@ -115,6 +115,37 @@ class WIPService {
 
         return response.json();
     }
+
+    // Export functionality
+    async downloadExcel(): Promise<void> {
+        const response = await fetch(`${API_BASE}/wip/export/excel`, {
+            headers: this.getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to export data: ${response.statusText}`);
+        }
+
+        // Get filename from response headers or create default
+        const contentDisposition = response.headers.get("content-disposition");
+        let filename = "TSI_WIP_Report.xlsx";
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (match) filename = match[1];
+        }
+
+        // Download file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
 }
 
 export const wipService = new WIPService();
+
