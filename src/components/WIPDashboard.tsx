@@ -361,12 +361,12 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                     {formatCurrency(wipTotals.total_job_margin)}
                                 </div>
                             </div>
-                            <div>
+                            {/* <div>
                                 <div className="text-gray-600">Overall Margin %</div>
                                 <div className="font-bold text-lg text-green-600">
                                     {wipTotals.overall_margin_percent?.toFixed(1)}%
                                 </div>
-                            </div>
+                            </div> */}
                         </div>
                     </div>
                 )}
