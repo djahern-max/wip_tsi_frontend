@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Building2, Calculator } from 'lucide-react';
-import { authAPI } from '../api/auth';
+import { authAPI } from '../lib/api';
 
 interface LoginFormProps {
     onLoginSuccess: (token: string, user: { username: string; role: string }) => void;

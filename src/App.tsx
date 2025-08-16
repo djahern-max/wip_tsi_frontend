@@ -15,7 +15,6 @@ function App() {
     // Check if user is already logged in
     const token = localStorage.getItem('authToken');
     if (token) {
-      // TODO: Verify token with backend
       setIsAuthenticated(true);
     }
     setIsLoading(false);
@@ -44,7 +43,7 @@ function App() {
     return <LoginForm onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Main dashboard (we'll build this next)
+  // Main dashboard
   return (
     <div className="min-h-screen bg-gradient-dark">
       <div className="p-8">
