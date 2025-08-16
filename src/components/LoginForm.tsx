@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Calculator, Zap } from 'lucide-react';
-import { authAPI } from '../lib/api';
+import { Eye, EyeOff, Building2, Calculator } from 'lucide-react';
+import { authAPI } from '../api/auth';
 
 interface LoginFormProps {
     onLoginSuccess: (token: string, user: { username: string; role: string }) => void;
@@ -32,8 +32,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     };
 
     const quickLoginButtons = [
-        { username: 'dahern@gototsi.com', label: 'Admin Login', role: 'admin', icon: Zap },
-        { username: 'kulike@muehlhan.com', label: 'Viewer Login', role: 'viewer', icon: Eye },
+        { username: 'dahern@gototsi.com', label: 'Admin Login', role: 'admin' },
+        { username: 'kulike@muehlhan.com', label: 'Viewer Login', role: 'viewer' },
     ];
 
     const handleQuickLogin = (user: string) => {
@@ -42,45 +42,31 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8">
-                {/* Header with React-inspired design */}
+                {/* Header */}
                 <div className="text-center">
-                    <div className="flex justify-center items-center space-x-3 mb-6">
-                        <div className="relative">
-                            <Calculator className="h-10 w-10 text-cyan-400 animate-spin-slow" />
-                            <div className="absolute -top-1 -right-1 h-3 w-3 bg-cyan-400 rounded-full animate-pulse"></div>
-                        </div>
-                        <div className="h-8 w-px bg-cyan-400/30"></div>
-                        <div className="text-3xl font-bold">
-                            <span className="text-cyan-400">TSI</span>
-                            <span className="text-cyan-200 ml-2">WIP</span>
-                        </div>
+                    <div className="flex justify-center items-center space-x-2 mb-4">
+                        <Building2 className="h-8 w-8 text-blue-600" />
+                        <Calculator className="h-8 w-8 text-blue-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-cyan-100 mb-2">
-                        Modern WIP Reporting
-                    </h2>
-                    <p className="text-sm text-cyan-300/80">
-                        Replacing spreadsheet confusion with calculated clarity
+                    <h2 className="text-3xl font-bold text-gray-900">TSI WIP Reporting</h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                        Clean, calculated WIP data to replace confusing spreadsheets
                     </p>
-                    <div className="mt-4 flex justify-center">
-                        <div className="bg-gradient-cyan text-dark-900 px-3 py-1 rounded-full text-xs font-semibold">
-                            $43.1M Total Contract Value
-                        </div>
-                    </div>
                 </div>
 
                 {/* Login Form */}
                 <div className="card">
                     <div className="card-content space-y-6">
                         {error && (
-                            <div className="bg-red-900/50 border border-red-700 rounded-md p-4">
-                                <p className="text-sm text-red-300">{error}</p>
+                            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                                <p className="text-sm text-red-600">{error}</p>
                             </div>
                         )}
 
                         <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-cyan-200 mb-2">
+                            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
                                 Email Address
                             </label>
                             <input
@@ -88,7 +74,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                 name="username"
                                 type="email"
                                 required
-                                className="input"
+                                className="input mt-1"
                                 placeholder="Enter your email"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -96,10 +82,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-cyan-200 mb-2">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Password
                             </label>
-                            <div className="relative">
+                            <div className="mt-1 relative">
                                 <input
                                     id="password"
                                     name="password"
@@ -116,9 +102,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                     onClick={() => setShowPassword(!showPassword)}
                                 >
                                     {showPassword ? (
-                                        <EyeOff className="h-4 w-4 text-cyan-400" />
+                                        <EyeOff className="h-4 w-4 text-gray-400" />
                                     ) : (
-                                        <Eye className="h-4 w-4 text-cyan-400" />
+                                        <Eye className="h-4 w-4 text-gray-400" />
                                     )}
                                 </button>
                             </div>
@@ -128,67 +114,39 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                             type="submit"
                             onClick={handleSubmit}
                             disabled={isLoading}
-                            className="btn-primary w-full h-12 text-base font-semibold"
+                            className="btn-primary w-full"
                         >
-                            {isLoading ? (
-                                <div className="flex items-center space-x-2">
-                                    <Calculator className="h-4 w-4 animate-spin" />
-                                    <span>Signing in...</span>
-                                </div>
-                            ) : (
-                                'Sign In'
-                            )}
+                            {isLoading ? 'Signing in...' : 'Sign In'}
                         </button>
                     </div>
                 </div>
 
                 {/* Quick Login Buttons */}
                 <div className="space-y-4">
-                    <div className="text-center">
-                        <div className="inline-flex items-center space-x-2 text-sm text-cyan-300">
-                            <div className="h-px bg-cyan-600 flex-1 w-12"></div>
-                            <span>Quick Login (Demo)</span>
-                            <div className="h-px bg-cyan-600 flex-1 w-12"></div>
-                        </div>
-                    </div>
-
+                    <p className="text-center text-sm text-gray-600">Quick Login (Demo)</p>
                     <div className="grid grid-cols-2 gap-3">
-                        {quickLoginButtons.map((user) => {
-                            const IconComponent = user.icon;
-                            return (
-                                <button
-                                    key={user.username}
-                                    onClick={() => handleQuickLogin(user.username)}
-                                    className="btn-secondary p-4 h-auto flex flex-col items-center space-y-2 hover:border-cyan-400 transition-colors group"
-                                >
-                                    <IconComponent className="h-5 w-5 text-cyan-400 group-hover:text-cyan-300" />
-                                    <div className="text-xs font-medium">{user.label}</div>
-                                    <div className="text-xs text-cyan-400 opacity-75">
-                                        {user.role === 'admin' ? 'Can edit data' : 'View only'}
-                                    </div>
-                                </button>
-                            );
-                        })}
+                        {quickLoginButtons.map((user) => (
+                            <button
+                                key={user.username}
+                                onClick={() => handleQuickLogin(user.username)}
+                                className="btn-secondary text-xs"
+                            >
+                                {user.label}
+                                <span className="block text-xs text-gray-500 mt-1">
+                                    {user.role === 'admin' ? 'Can edit data' : 'View only'}
+                                </span>
+                            </button>
+                        ))}
                     </div>
-
-                    <div className="text-center">
-                        <p className="text-xs text-cyan-400/60">
-                            Demo password: <code className="bg-dark-700 text-cyan-300 px-2 py-1 rounded font-mono">123456</code>
-                        </p>
-                    </div>
+                    <p className="text-center text-xs text-gray-500">
+                        All demo accounts use password: <code className="bg-gray-100 px-1 rounded">123456</code>
+                    </p>
                 </div>
 
                 {/* Footer */}
-                <div className="text-center space-y-3">
-                    <div className="flex justify-center items-center space-x-4 text-xs text-cyan-400/60">
-                        <span>FastAPI Backend</span>
-                        <div className="h-1 w-1 bg-cyan-400 rounded-full"></div>
-                        <span>React Frontend</span>
-                        <div className="h-1 w-1 bg-cyan-400 rounded-full"></div>
-                        <span>PostgreSQL</span>
-                    </div>
-                    <p className="text-xs text-cyan-400/40">
-                        Built with ❤️ to eliminate spreadsheet confusion
+                <div className="text-center">
+                    <p className="text-xs text-gray-500">
+                        Built with FastAPI + React • Replacing spreadsheet confusion since 2025
                     </p>
                 </div>
             </div>
