@@ -7,46 +7,55 @@ import { wipAPI, WIPWithTotalsResponse } from '../lib/api'; // Import the new AP
 import { CommentModal } from './CommentModal';
 import WIPTotalsRow from './WIPTotalsRow'; // Import the totals row component
 
-// Column definitions with all 23 data fields
-const COLUMNS: WIPColumn[] = [
-    // System Fields (frozen)
-    { key: 'job_number', label: 'Job #', section: 'system', width: '100px', frozen: true },
-    { key: 'project_name', label: 'Project Name', section: 'system', width: '300px', frozen: true },
+// Dynamic column generation function
+const getDynamicColumns = (reportDate: string): WIPColumn[] => {
+    const currentDate = new Date(reportDate);
+    const priorDate = new Date(currentDate);
+    priorDate.setMonth(priorDate.getMonth() - 1);
 
-    // Contract Section (5 columns)
-    { key: 'current_month_original_contract_amount', label: 'Original Contract', section: 'contract', width: '140px', type: 'currency' },
-    { key: 'current_month_change_order_amount', label: 'Change Orders', section: 'contract', width: '130px', type: 'currency' },
-    { key: 'current_month_total_contract_amount', label: 'Total Contract', section: 'contract', width: '140px', type: 'currency' },
-    { key: 'prior_month_total_contract_amount', label: 'Prior Contract', section: 'contract', width: '130px', type: 'currency' },
-    { key: 'current_vs_prior_contract_variance', label: 'Contract Variance', section: 'contract', width: '140px', type: 'currency' },
+    const currentMonthName = currentDate.toLocaleDateString('en-US', { month: 'long' });
+    const priorMonthName = priorDate.toLocaleDateString('en-US', { month: 'long' });
 
-    // Cost Section (5 columns)
-    { key: 'current_month_cost_to_date', label: 'Cost to Date', section: 'cost', width: '130px', type: 'currency' },
-    { key: 'current_month_estimated_cost_to_complete', label: 'Est. Cost to Complete', section: 'cost', width: '160px', type: 'currency' },
-    { key: 'current_month_estimated_final_cost', label: 'Est. Final Cost', section: 'cost', width: '140px', type: 'currency' },
-    { key: 'prior_month_estimated_final_cost', label: 'Prior Final Cost', section: 'cost', width: '140px', type: 'currency' },
-    { key: 'current_vs_prior_estimated_final_cost_variance', label: 'Final Cost Variance', section: 'cost', width: '150px', type: 'currency' },
+    return [
+        // System Fields (frozen)
+        { key: 'job_number', label: 'Job #', section: 'system', width: '100px', frozen: true },
+        { key: 'project_name', label: 'Project Name', section: 'system', width: '300px', frozen: true },
 
-    // US GAAP Section (4 columns)
-    { key: 'us_gaap_percent_completion', label: 'GAAP % Complete', section: 'gaap', width: '130px', type: 'percentage' },
-    { key: 'revenue_earned_to_date_us_gaap', label: 'Revenue Earned (GAAP)', section: 'gaap', width: '160px', type: 'currency' },
-    { key: 'estimated_job_margin_to_date_us_gaap', label: 'Job Margin (GAAP)', section: 'gaap', width: '150px', type: 'currency' },
-    { key: 'estimated_job_margin_to_date_percent_sales', label: 'Job Margin %', section: 'gaap', width: '120px', type: 'percentage' },
+        // Contract Section (5 columns)
+        { key: 'current_month_original_contract_amount', label: 'Original Contract', section: 'contract', width: '140px', type: 'currency' },
+        { key: 'current_month_change_order_amount', label: 'Change Orders', section: 'contract', width: '130px', type: 'currency' },
+        { key: 'current_month_total_contract_amount', label: `${currentMonthName} Contract`, section: 'contract', width: '140px', type: 'currency' },
+        { key: 'prior_month_total_contract_amount', label: `${priorMonthName} Contract`, section: 'contract', width: '130px', type: 'currency' },
+        { key: 'current_vs_prior_contract_variance', label: 'Contract Variance', section: 'contract', width: '140px', type: 'currency' },
 
-    // Job Margin Section (4 columns)
-    { key: 'current_month_estimated_job_margin_at_completion', label: 'Est. Job Margin', section: 'margin', width: '140px', type: 'currency' },
-    { key: 'prior_month_estimated_job_margin_at_completion', label: 'Prior Job Margin', section: 'margin', width: '140px', type: 'currency' },
-    { key: 'current_vs_prior_estimated_job_margin', label: 'Job Margin Variance', section: 'margin', width: '150px', type: 'currency' },
-    { key: 'current_month_estimated_job_margin_percent_sales', label: 'Job Margin % Sales', section: 'margin', width: '150px', type: 'percentage' },
+        // Cost Section (5 columns)
+        { key: 'current_month_cost_to_date', label: 'Cost to Date', section: 'cost', width: '130px', type: 'currency' },
+        { key: 'current_month_estimated_cost_to_complete', label: 'Est. Cost to Complete', section: 'cost', width: '160px', type: 'currency' },
+        { key: 'current_month_estimated_final_cost', label: `${currentMonthName} Final Cost`, section: 'cost', width: '140px', type: 'currency' },
+        { key: 'prior_month_estimated_final_cost', label: `${priorMonthName} Final Cost`, section: 'cost', width: '140px', type: 'currency' },
+        { key: 'current_vs_prior_estimated_final_cost_variance', label: 'Final Cost Variance', section: 'cost', width: '150px', type: 'currency' },
 
-    // Billing Section (1 column)
-    { key: 'current_month_revenue_billed_to_date', label: 'Revenue Billed', section: 'billing', width: '140px', type: 'currency' },
+        // US GAAP Section (4 columns)
+        { key: 'us_gaap_percent_completion', label: 'GAAP % Complete', section: 'gaap', width: '130px', type: 'percentage' },
+        { key: 'revenue_earned_to_date_us_gaap', label: 'Revenue Earned (GAAP)', section: 'gaap', width: '160px', type: 'currency' },
+        { key: 'estimated_job_margin_to_date_us_gaap', label: 'Job Margin (GAAP)', section: 'gaap', width: '150px', type: 'currency' },
+        { key: 'estimated_job_margin_to_date_percent_sales', label: 'Job Margin %', section: 'gaap', width: '120px', type: 'percentage' },
 
-    // WIP Adjustments (3 columns)
-    { key: 'current_month_costs_in_excess_billings', label: 'Costs in Excess', section: 'adjustments', width: '140px', type: 'currency' },
-    { key: 'current_month_billings_excess_revenue', label: 'Billings in Excess', section: 'adjustments', width: '150px', type: 'currency' },
-    { key: 'current_month_addl_entry_required', label: 'Additional Entry', section: 'adjustments', width: '140px', type: 'currency' }
-];
+        // Job Margin Section (4 columns)
+        { key: 'current_month_estimated_job_margin_at_completion', label: `${currentMonthName} Job Margin`, section: 'margin', width: '140px', type: 'currency' },
+        { key: 'prior_month_estimated_job_margin_at_completion', label: `${priorMonthName} Job Margin`, section: 'margin', width: '140px', type: 'currency' },
+        { key: 'current_vs_prior_estimated_job_margin', label: 'Job Margin Variance', section: 'margin', width: '150px', type: 'currency' },
+        { key: 'current_month_estimated_job_margin_percent_sales', label: 'Job Margin % Sales', section: 'margin', width: '150px', type: 'percentage' },
+
+        // Billing Section (1 column)
+        { key: 'current_month_revenue_billed_to_date', label: 'Revenue Billed', section: 'billing', width: '140px', type: 'currency' },
+
+        // WIP Adjustments (3 columns)
+        { key: 'current_month_costs_in_excess_billings', label: 'Costs in Excess', section: 'adjustments', width: '140px', type: 'currency' },
+        { key: 'current_month_billings_excess_revenue', label: 'Billings in Excess', section: 'adjustments', width: '150px', type: 'currency' },
+        { key: 'current_month_addl_entry_required', label: 'Additional Entry', section: 'adjustments', width: '140px', type: 'currency' }
+    ];
+};
 
 // Professional section colors for collapsible headers
 const SECTION_COLORS: Record<string, string> = {
@@ -168,6 +177,9 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [reportDate, setReportDate] = useState<string>('2025-07-31');
+
+    // Generate dynamic columns based on report date
+    const columns = getDynamicColumns(reportDate);
 
     // Comment modal state
     const [commentModal, setCommentModal] = useState<{
@@ -295,7 +307,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
     };
 
     // Group columns by section for header
-    const groupedColumns = COLUMNS.reduce((acc, col) => {
+    const groupedColumns = columns.reduce((acc, col) => {
         if (!acc[col.section]) acc[col.section] = [];
         acc[col.section].push(col);
         return acc;
@@ -361,12 +373,12 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                     {formatCurrency(wipTotals.total_job_margin)}
                                 </div>
                             </div>
-                            {/* <div>
+                            <div>
                                 <div className="text-gray-600">Overall Margin %</div>
                                 <div className="font-bold text-lg text-green-600">
                                     {wipTotals.overall_margin_percent?.toFixed(1)}%
                                 </div>
-                            </div> */}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -391,7 +403,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                     </th>
                                 ))}</tr>
 
-                                <tr className="sticky top-10 z-30 bg-gray-100 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] h-12">{COLUMNS.map(col => (
+                                <tr className="sticky top-10 z-30 bg-gray-100 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] h-12">{columns.map(col => (
                                     <th
                                         key={col.key}
                                         className={[
@@ -417,7 +429,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                         key={job.id}
                                         className="odd:bg-white even:bg-gray-50 hover:bg-gray-100"
                                     >
-                                        {COLUMNS.map(col => (
+                                        {columns.map(col => (
                                             <td
                                                 key={`${job.id}-${col.key}`}
                                                 className={`${col.frozen
