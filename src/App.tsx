@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
 import { WIPDashboard } from './components/WIPDashboard';
+import { Header } from './components/Header';
+import { wipService } from './services/wipService';
 
 interface User {
   username: string;
@@ -11,14 +13,13 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dashboardKey, setDashboardKey] = useState(0);
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = localStorage.getItem('access_token'); // Updated to match your API
+    const token = localStorage.getItem('access_token');
     if (token) {
       setIsAuthenticated(true);
-      // TODO: Verify token and get user data from API
-      // For now, we'll check if there's stored user data
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         setUser(JSON.parse(storedUser));
@@ -28,7 +29,6 @@ function App() {
   }, []);
 
   const handleLoginSuccess = (token: string, userData: { username: string; role: string }) => {
-    // Store both token and user data
     localStorage.setItem('access_token', token);
     localStorage.setItem('user', JSON.stringify(userData));
 
@@ -46,6 +46,19 @@ function App() {
     setUser(null);
   };
 
+  const handleRefresh = () => {
+    setDashboardKey(prev => prev + 1);
+  };
+
+  const handleExport = async () => {
+    try {
+      await wipService.downloadExcel();
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Export failed: " + (err instanceof Error ? err.message : "Unknown error"));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -54,38 +67,23 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <LoginForm onLoginSuccess={handleLoginSuccess} />;
   }
 
   // Main dashboard
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            TSI WIP Reporting
-          </h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-700">
-              Welcome, <span className="font-semibold">{user?.username}</span>
-              <span className="ml-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full uppercase">
-                {user?.role}
-              </span>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Header Component */}
+      <Header
+        user={user}
+        onRefresh={handleRefresh}
+        onExport={handleExport}
+        onLogout={handleLogout}
+      />
 
       {/* WIP Dashboard */}
-      <WIPDashboard />
+      <WIPDashboard key={dashboardKey} />
     </div>
   );
 }

@@ -49,7 +49,6 @@ const COLUMNS: WIPColumn[] = [
 // Professional section colors for collapsible headers
 const SECTION_COLORS: Record<string, string> = {
     system: 'bg-green-100 text-green-800 border-green-300',
-
     contract: 'bg-blue-100 text-blue-800 border-blue-300',
     cost: 'bg-violet-200 text-violet-900 border-violet-300',
     gaap: 'bg-purple-100 text-purple-800 border-purple-300',
@@ -58,14 +57,17 @@ const SECTION_COLORS: Record<string, string> = {
     adjustments: 'bg-red-100 text-red-800 border-red-300'
 };
 
-const SECTION_LABELS: Record<string, string> = {
-    system: 'Projects',
-    contract: 'Contract Section',
-    cost: 'Cost Section',
-    gaap: 'US GAAP Section',
-    margin: 'Job Margin Section',
-    billing: 'Billing Section',
-    adjustments: 'WIP Adjustments'
+const getSectionLabel = (section: string, reportDate?: string): string => {
+    const labels: Record<string, string> = {
+        system: reportDate ? `Projects - ${new Date(reportDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : 'Projects',
+        contract: 'Contract Section',
+        cost: 'Cost Section',
+        gaap: 'US GAAP Section',
+        margin: 'Job Margin Section',
+        billing: 'Billing Section',
+        adjustments: 'WIP Adjustments'
+    };
+    return labels[section] || section;
 };
 
 // Formatting functions
@@ -128,6 +130,8 @@ interface TableCellProps {
 const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, hasComment, onAddComment }) => {
     const formattedValue = formatValue(value, type);
 
+
+
     return (
         <div className="group relative">
             <div className="p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50">
@@ -152,7 +156,15 @@ const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, ha
     );
 };
 
-export const WIPDashboard: React.FC = () => {
+interface WIPDashboardProps {
+    onReportDateUpdate?: (date: string) => void;
+}
+
+interface WIPDashboardProps {
+    onReportDateUpdate?: (date: string) => void;
+}
+
+export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }) => {
     const [wipData, setWipData] = useState<WIPSnapshot[]>([]);
     const [explanations, setExplanations] = useState<Record<string, CellExplanation[]>>({});
     const [loading, setLoading] = useState(true);
@@ -190,6 +202,10 @@ export const WIPDashboard: React.FC = () => {
             // Set report date from first record
             if (data.length > 0) {
                 setReportDate(data[0].report_date);
+                // Notify parent component of report date
+                if (onReportDateUpdate) {
+                    onReportDateUpdate(data[0].report_date);
+                }
             }
 
             // Load explanations for each WIP snapshot
@@ -211,7 +227,6 @@ export const WIPDashboard: React.FC = () => {
             setLoading(false);
         }
     };
-
 
     const handleExport = async () => {
         try {
@@ -322,65 +337,48 @@ export const WIPDashboard: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="container mx-auto px-6 py-8">
-                {/* Header */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">TSI Work in Process Dashboard</h1>
-                            <p className="text-gray-600 mt-1">
-                                Report Date: <span className="font-semibold text-gray-700">July 31, 2025</span>
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={loadWIPData}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                <RefreshCw size={16} />
-                                Refresh
-                            </button>
-<button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
-                                <Download size={16} />
-                                Export
-                            </button>
-                        </div>
-                    </div>
-                </div>
+        <div className="bg-gray-50">
+            <div className="w-full px-4 py-4">
 
-                {/* Table Container */}
+                {/* Table Container with Sticky Headers */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            {/* Section Headers */}
-                            <thead>
-                                <tr className="border-b-2 border-gray-300">
-                                    {Object.entries(groupedColumns).map(([section, cols]) => (
-                                        <th
-                                            key={section}
-                                            colSpan={cols.length}
-                                            className={`px-4 py-3 text-left text-sm font-bold uppercase tracking-wider ${SECTION_COLORS[section]}`}
-                                        >
-                                            {SECTION_LABELS[section]}
-                                        </th>
-                                    ))}
-                                </tr>
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-140px)]">
+                        <table className="w-full border-separate border-spacing-0">
+                            {/* Section Headers - Sticky row #1 */}
+                            <thead className="sticky top-0 z-30">
+                                <tr className="h-10">{Object.entries(groupedColumns).map(([section, cols]) => (
+                                    <th
+                                        key={section}
+                                        colSpan={cols.length}
+                                        className={[
+                                            "sticky top-0 px-4 text-left text-[13px] font-bold uppercase tracking-wider",
+                                            "shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
+                                            SECTION_COLORS[section],
+                                        ].join(" ")}
+                                    >
+                                        {getSectionLabel(section, section === 'system' ? reportDate : undefined)}
+                                    </th>
+                                ))}</tr>
 
-                                {/* Column Headers */}
-                                <tr className="bg-gray-100 border-b border-gray-300">
-                                    {COLUMNS.map(col => (
-                                        <th
-                                            key={col.key}
-                                            className={`px-2 py-3 text-left text-xs font-bold text-gray-800 uppercase tracking-wider border-r border-gray-300 ${col.frozen ? 'sticky left-0 bg-gray-100 z-10' : ''
-                                                }`}
-                                            style={{ width: col.width, minWidth: col.width }}
-                                        >
-                                            {col.label}
-                                        </th>
-                                    ))}
-                                </tr>
+                                <tr className="sticky top-10 z-30 bg-gray-100 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)] h-12">{COLUMNS.map(col => (
+                                    <th
+                                        key={col.key}
+                                        className={[
+                                            "px-2 text-left text-[11px] font-bold text-gray-800 uppercase tracking-wider",
+                                            "border-r border-gray-300",
+                                            col.frozen ? "sticky left-0 z-40 bg-gray-100" : "bg-gray-100",
+                                        ].join(" ")}
+                                        style={{
+                                            width: col.width,
+                                            minWidth: col.width,
+                                            ...(col.frozen && { left: col.key === 'job_number' ? 0 : '100px' }),
+                                        }}
+                                    >
+                                        {col.label}
+                                    </th>
+                                ))}</tr>
                             </thead>
+
 
                             {/* Data Rows */}
                             <tbody className="divide-y divide-gray-200">
@@ -389,8 +387,12 @@ export const WIPDashboard: React.FC = () => {
                                         {COLUMNS.map(col => (
                                             <td
                                                 key={`${job.id}-${col.key}`}
-                                                className={`${col.frozen ? 'sticky left-0 bg-white hover:bg-gray-50 z-10 border-r border-gray-300' : ''}`}
-                                                style={{ width: col.width, minWidth: col.width }}
+                                                className={`${col.frozen ? 'sticky bg-white hover:bg-gray-50 z-10 border-r border-gray-300' : ''}`}
+                                                style={{
+                                                    width: col.width,
+                                                    minWidth: col.width,
+                                                    ...(col.frozen && { left: col.key === 'job_number' ? 0 : '100px' })
+                                                }}
                                             >
                                                 {col.key === 'job_number' || col.key === 'project_name' ? (
                                                     <div className="p-2 text-sm font-medium text-gray-900 border-r border-gray-200">
@@ -415,42 +417,8 @@ export const WIPDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Summary Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="text-center">
-                            <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{wipData.length}</p>
-                        </div>
-                    </div>
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="text-center">
-                            <p className="text-sm font-medium text-gray-600">Total Contract Value</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">
-                                {formatCurrency(
-                                    wipData.reduce((sum, job) => sum + (job.current_month_total_contract_amount || 0), 0)
-                                )}
-                            </p>
-                        </div>
-                    </div>
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="text-center">
-                            <p className="text-sm font-medium text-gray-600">Total Costs to Date</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">
-                                {formatCurrency(
-                                    wipData.reduce((sum, job) => sum + (job.current_month_cost_to_date || 0), 0)
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className="text-center mt-8 text-gray-500">
-                    <p>Professional WIP Reporting • Clear, organized, and actionable</p>
-                </div>
             </div>
 
             {/* Comment Modal */}
