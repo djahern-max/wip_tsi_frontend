@@ -102,17 +102,17 @@ export interface WIPDashboardSummary {
     report_date: string;
 }
 
-// Auth token management
-let authToken: string | null = localStorage.getItem('authToken');
+// Auth token management - FIXED to use access_token
+let authToken: string | null = localStorage.getItem('access_token');
 
 export const setAuthToken = (token: string | null) => {
     authToken = token;
     if (token) {
-        localStorage.setItem('authToken', token);
-        apiClient.defaults.headers.Authorization = `Bearer ${token}`;
+        localStorage.setItem('access_token', token);  // ✅ 
+        // ...
     } else {
-        localStorage.removeItem('authToken');
-        delete apiClient.defaults.headers.Authorization;
+        localStorage.removeItem('access_token');  // ✅
+        // ...
     }
 };
 

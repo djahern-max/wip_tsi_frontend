@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Building2, Calculator } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '../lib/api';
 
 interface LoginFormProps {
@@ -31,42 +31,36 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         }
     };
 
-    const quickLoginButtons = [
-        { username: 'dahern@gototsi.com', label: 'Admin Login', role: 'admin' },
-        { username: 'kulike@muehlhan.com', label: 'Viewer Login', role: 'viewer' },
-    ];
-
-    const handleQuickLogin = (user: string) => {
-        setUsername(user);
-        setPassword('123456');
-    };
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8">
-                {/* Header */}
+                {/* Header with Logo */}
                 <div className="text-center">
-                    <div className="flex justify-center items-center space-x-2 mb-4">
-                        <Building2 className="h-8 w-8 text-blue-600" />
-                        <Calculator className="h-8 w-8 text-blue-600" />
+                    <div className="flex justify-center mb-8">
+                        <img
+                            src="/logo.png"
+                            alt="TSI Logo"
+                            className="h-40 w-auto"
+                        />
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900">TSI WIP Reporting</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Clean, calculated WIP data to replace confusing spreadsheets
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">TSI WIP Reporting</h2>
+                    <p className="text-sm text-gray-500 leading-relaxed">
+
+                        <span className="text-gray-400">Replacing spreadsheet complexity with clarity</span>
                     </p>
                 </div>
 
                 {/* Login Form */}
-                <div className="card">
-                    <div className="card-content space-y-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                                <p className="text-sm text-red-600">{error}</p>
+                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                <p className="text-sm text-red-700">{error}</p>
                             </div>
                         )}
 
                         <div>
-                            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                                 Email Address
                             </label>
                             <input
@@ -74,24 +68,24 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                 name="username"
                                 type="email"
                                 required
-                                className="input mt-1"
-                                placeholder="Enter your email"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors"
+                                placeholder="you@company.com"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Password
                             </label>
-                            <div className="mt-1 relative">
+                            <div className="relative">
                                 <input
                                     id="password"
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="input pr-10"
+                                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-colors"
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -102,9 +96,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                     onClick={() => setShowPassword(!showPassword)}
                                 >
                                     {showPassword ? (
-                                        <EyeOff className="h-4 w-4 text-gray-400" />
+                                        <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                                     ) : (
-                                        <Eye className="h-4 w-4 text-gray-400" />
+                                        <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                                     )}
                                 </button>
                             </div>
@@ -112,42 +106,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
                         <button
                             type="submit"
-                            onClick={handleSubmit}
                             disabled={isLoading}
-                            className="btn-primary w-full"
+                            className="w-full py-2 px-4 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {isLoading ? 'Signing in...' : 'Sign In'}
                         </button>
-                    </div>
-                </div>
-
-                {/* Quick Login Buttons */}
-                <div className="space-y-4">
-                    <p className="text-center text-sm text-gray-600">Quick Login (Demo)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                        {quickLoginButtons.map((user) => (
-                            <button
-                                key={user.username}
-                                onClick={() => handleQuickLogin(user.username)}
-                                className="btn-secondary text-xs"
-                            >
-                                {user.label}
-                                <span className="block text-xs text-gray-500 mt-1">
-                                    {user.role === 'admin' ? 'Can edit data' : 'View only'}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                    <p className="text-center text-xs text-gray-500">
-                        All demo accounts use password: <code className="bg-gray-100 px-1 rounded">123456</code>
-                    </p>
+                    </form>
                 </div>
 
                 {/* Footer */}
-                <div className="text-center">
-                    <p className="text-xs text-gray-500">
-                        Built with FastAPI + React • Replacing spreadsheet confusion since 2025
-                    </p>
+                <div className="text-center pt-6">
+
                 </div>
             </div>
         </div>

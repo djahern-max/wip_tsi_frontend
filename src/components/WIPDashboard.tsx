@@ -1,0 +1,458 @@
+// src/components/WIPDashboard.tsx
+import React, { useState, useEffect } from 'react';
+import { MessageCircle, Download, RefreshCw, AlertCircle } from 'lucide-react';
+import { WIPSnapshot, CellExplanation, WIPColumn } from '../types/wip';
+import { wipService } from '../services/wipService';
+import { CommentModal } from './CommentModal';
+
+// Column definitions with all 23 data fields
+const COLUMNS: WIPColumn[] = [
+    // System Fields (frozen)
+    { key: 'job_number', label: 'Job #', section: 'system', width: '100px', frozen: true },
+    { key: 'project_name', label: 'Project Name', section: 'system', width: '300px', frozen: true },
+
+    // Contract Section (5 columns)
+    { key: 'current_month_original_contract_amount', label: 'Original Contract', section: 'contract', width: '140px', type: 'currency' },
+    { key: 'current_month_change_order_amount', label: 'Change Orders', section: 'contract', width: '130px', type: 'currency' },
+    { key: 'current_month_total_contract_amount', label: 'Total Contract', section: 'contract', width: '140px', type: 'currency' },
+    { key: 'prior_month_total_contract_amount', label: 'Prior Contract', section: 'contract', width: '130px', type: 'currency' },
+    { key: 'current_vs_prior_contract_variance', label: 'Contract Variance', section: 'contract', width: '140px', type: 'currency' },
+
+    // Cost Section (5 columns)
+    { key: 'current_month_cost_to_date', label: 'Cost to Date', section: 'cost', width: '130px', type: 'currency' },
+    { key: 'current_month_estimated_cost_to_complete', label: 'Est. Cost to Complete', section: 'cost', width: '160px', type: 'currency' },
+    { key: 'current_month_estimated_final_cost', label: 'Est. Final Cost', section: 'cost', width: '140px', type: 'currency' },
+    { key: 'prior_month_estimated_final_cost', label: 'Prior Final Cost', section: 'cost', width: '140px', type: 'currency' },
+    { key: 'current_vs_prior_estimated_final_cost_variance', label: 'Final Cost Variance', section: 'cost', width: '150px', type: 'currency' },
+
+    // US GAAP Section (4 columns)
+    { key: 'us_gaap_percent_completion', label: 'GAAP % Complete', section: 'gaap', width: '130px', type: 'percentage' },
+    { key: 'revenue_earned_to_date_us_gaap', label: 'Revenue Earned (GAAP)', section: 'gaap', width: '160px', type: 'currency' },
+    { key: 'estimated_job_margin_to_date_us_gaap', label: 'Job Margin (GAAP)', section: 'gaap', width: '150px', type: 'currency' },
+    { key: 'estimated_job_margin_to_date_percent_sales', label: 'Job Margin %', section: 'gaap', width: '120px', type: 'percentage' },
+
+    // Job Margin Section (4 columns)
+    { key: 'current_month_estimated_job_margin_at_completion', label: 'Est. Job Margin', section: 'margin', width: '140px', type: 'currency' },
+    { key: 'prior_month_estimated_job_margin_at_completion', label: 'Prior Job Margin', section: 'margin', width: '140px', type: 'currency' },
+    { key: 'current_vs_prior_estimated_job_margin', label: 'Job Margin Variance', section: 'margin', width: '150px', type: 'currency' },
+    { key: 'current_month_estimated_job_margin_percent_sales', label: 'Job Margin % Sales', section: 'margin', width: '150px', type: 'percentage' },
+
+    // Billing Section (1 column)
+    { key: 'current_month_revenue_billed_to_date', label: 'Revenue Billed', section: 'billing', width: '140px', type: 'currency' },
+
+    // WIP Adjustments (3 columns)
+    { key: 'current_month_costs_in_excess_billings', label: 'Costs in Excess', section: 'adjustments', width: '140px', type: 'currency' },
+    { key: 'current_month_billings_excess_revenue', label: 'Billings in Excess', section: 'adjustments', width: '150px', type: 'currency' },
+    { key: 'current_month_addl_entry_required', label: 'Additional Entry', section: 'adjustments', width: '140px', type: 'currency' }
+];
+
+// Professional section colors for collapsible headers
+const SECTION_COLORS: Record<string, string> = {
+    system: 'bg-green-100 text-green-800 border-green-300',
+
+    contract: 'bg-blue-100 text-blue-800 border-blue-300',
+    cost: 'bg-violet-200 text-violet-900 border-violet-300',
+    gaap: 'bg-purple-100 text-purple-800 border-purple-300',
+    margin: 'bg-orange-100 text-orange-800 border-orange-300',
+    billing: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    adjustments: 'bg-red-100 text-red-800 border-red-300'
+};
+
+const SECTION_LABELS: Record<string, string> = {
+    system: 'Projects',
+    contract: 'Contract Section',
+    cost: 'Cost Section',
+    gaap: 'US GAAP Section',
+    margin: 'Job Margin Section',
+    billing: 'Billing Section',
+    adjustments: 'WIP Adjustments'
+};
+
+// Formatting functions
+const formatCurrency = (value: number | null | undefined): string => {
+    if (value == null || value === 0) return '';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
+};
+
+const formatPercentage = (value: number | null | undefined): string => {
+    if (value == null) return '';
+    return `${Number(value).toFixed(2)}%`;
+};
+
+const formatValue = (value: any, type?: string): string => {
+    if (type === 'currency') return formatCurrency(value);
+    if (type === 'percentage') return formatPercentage(value);
+    return value || '';
+};
+
+// Field label mapping
+const FIELD_LABELS: Record<string, string> = {
+    current_month_original_contract_amount: 'Original Contract Amount',
+    current_month_change_order_amount: 'Change Order Amount',
+    current_month_total_contract_amount: 'Total Contract Amount',
+    prior_month_total_contract_amount: 'Prior Month Contract',
+    current_vs_prior_contract_variance: 'Contract Variance',
+    current_month_cost_to_date: 'Cost to Date',
+    current_month_estimated_cost_to_complete: 'Estimated Cost to Complete',
+    current_month_estimated_final_cost: 'Estimated Final Cost',
+    prior_month_estimated_final_cost: 'Prior Month Final Cost',
+    current_vs_prior_estimated_final_cost_variance: 'Final Cost Variance',
+    us_gaap_percent_completion: 'US GAAP % Complete',
+    revenue_earned_to_date_us_gaap: 'Revenue Earned (GAAP)',
+    estimated_job_margin_to_date_us_gaap: 'Job Margin (GAAP)',
+    estimated_job_margin_to_date_percent_sales: 'Job Margin %',
+    current_month_estimated_job_margin_at_completion: 'Estimated Job Margin',
+    prior_month_estimated_job_margin_at_completion: 'Prior Job Margin',
+    current_vs_prior_estimated_job_margin: 'Job Margin Variance',
+    current_month_estimated_job_margin_percent_sales: 'Job Margin % of Sales',
+    current_month_revenue_billed_to_date: 'Revenue Billed to Date',
+    current_month_costs_in_excess_billings: 'Costs in Excess of Billings',
+    current_month_billings_excess_revenue: 'Billings in Excess of Revenue',
+    current_month_addl_entry_required: 'Additional Entry Required'
+};
+
+interface TableCellProps {
+    value: any;
+    type?: string;
+    jobNumber: string;
+    field: keyof WIPSnapshot;
+    hasComment?: string;
+    onAddComment: (jobNumber: string, field: keyof WIPSnapshot, value: string) => void;
+}
+
+const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, hasComment, onAddComment }) => {
+    const formattedValue = formatValue(value, type);
+
+    return (
+        <div className="group relative">
+            <div className="p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50">
+                {formattedValue}
+            </div>
+            <button
+                onClick={() => onAddComment(jobNumber, field, formattedValue)}
+                className={`absolute top-1 right-1 p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 ${hasComment
+                    ? 'text-green-600 bg-green-100 hover:bg-green-200'
+                    : 'text-gray-400 hover:text-green-600 hover:bg-green-100'
+                    }`}
+                title={hasComment ? 'View/Edit Comment' : 'Add Comment'}
+            >
+                <MessageCircle size={12} />
+            </button>
+            {hasComment && (
+                <div className="absolute z-10 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
+                    {hasComment}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export const WIPDashboard: React.FC = () => {
+    const [wipData, setWipData] = useState<WIPSnapshot[]>([]);
+    const [explanations, setExplanations] = useState<Record<string, CellExplanation[]>>({});
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [reportDate, setReportDate] = useState<string>('2025-07-31');
+
+    // Comment modal state
+    const [commentModal, setCommentModal] = useState<{
+        isOpen: boolean;
+        jobNumber: string;
+        field: keyof WIPSnapshot;
+        value: string;
+        wipSnapshotId?: number;
+        existingComment?: string;
+        existingCommentId?: number;
+    }>({
+        isOpen: false,
+        jobNumber: '',
+        field: 'job_number',
+        value: ''
+    });
+
+    // Load data on mount
+    useEffect(() => {
+        loadWIPData();
+    }, []);
+
+    const loadWIPData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await wipService.getLatestWIPSnapshots();
+            setWipData(data);
+
+            // Set report date from first record
+            if (data.length > 0) {
+                setReportDate(data[0].report_date);
+            }
+
+            // Load explanations for each WIP snapshot
+            const explanationsMap: Record<string, CellExplanation[]> = {};
+            for (const wip of data) {
+                try {
+                    const wipExplanations = await wipService.getExplanations(wip.id);
+                    explanationsMap[wip.id.toString()] = wipExplanations;
+                } catch (err) {
+                    console.warn(`Failed to load explanations for WIP ${wip.id}:`, err);
+                }
+            }
+            setExplanations(explanationsMap);
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load WIP data');
+            console.error('Error loading WIP data:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAddComment = (jobNumber: string, field: keyof WIPSnapshot, value: string) => {
+        const wip = wipData.find(w => w.job_number === jobNumber);
+        if (!wip) return;
+
+        const wipExplanations = explanations[wip.id.toString()] || [];
+        const existingExplanation = wipExplanations.find(exp => exp.field_name === field);
+
+        setCommentModal({
+            isOpen: true,
+            jobNumber,
+            field,
+            value,
+            wipSnapshotId: wip.id,
+            existingComment: existingExplanation?.explanation,
+            existingCommentId: existingExplanation?.id
+        });
+    };
+
+    const handleSaveComment = async (comment: string) => {
+        if (!commentModal.wipSnapshotId) return;
+
+        try {
+            if (commentModal.existingCommentId) {
+                // Update existing comment
+                await wipService.updateExplanation(
+                    commentModal.wipSnapshotId,
+                    commentModal.existingCommentId,
+                    { explanation: comment }
+                );
+            } else {
+                // Create new comment
+                await wipService.createExplanation(commentModal.wipSnapshotId, {
+                    field_name: commentModal.field,
+                    explanation: comment
+                });
+            }
+
+            // Reload explanations
+            const updatedExplanations = await wipService.getExplanations(commentModal.wipSnapshotId);
+            setExplanations(prev => ({
+                ...prev,
+                [commentModal.wipSnapshotId!.toString()]: updatedExplanations
+            }));
+
+        } catch (err) {
+            console.error('Error saving comment:', err);
+            setError('Failed to save comment');
+        }
+    };
+
+    const getComment = (wipId: number, field: keyof WIPSnapshot): string | undefined => {
+        const wipExplanations = explanations[wipId.toString()] || [];
+        return wipExplanations.find(exp => exp.field_name === field)?.explanation;
+    };
+
+    // Group columns by section for header
+    const groupedColumns = COLUMNS.reduce((acc, col) => {
+        if (!acc[col.section]) acc[col.section] = [];
+        acc[col.section].push(col);
+        return acc;
+    }, {} as Record<string, WIPColumn[]>);
+
+    const formatReportDate = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <RefreshCw className="animate-spin mx-auto mb-4 text-gray-600" size={32} />
+                    <p className="text-gray-600">Loading WIP data...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <AlertCircle className="mx-auto mb-4 text-red-500" size={32} />
+                    <p className="text-red-600 mb-4">{error}</p>
+                    <button
+                        onClick={loadWIPData}
+                        className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <div className="container mx-auto px-6 py-8">
+                {/* Header */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">TSI Work in Process Dashboard</h1>
+                            <p className="text-gray-600 mt-1">
+                                Report Date: <span className="font-semibold text-gray-700">July 31, 2025</span>
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={loadWIPData}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                                <RefreshCw size={16} />
+                                Refresh
+                            </button>
+                            <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
+                                <Download size={16} />
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Table Container */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            {/* Section Headers */}
+                            <thead>
+                                <tr className="border-b-2 border-gray-300">
+                                    {Object.entries(groupedColumns).map(([section, cols]) => (
+                                        <th
+                                            key={section}
+                                            colSpan={cols.length}
+                                            className={`px-4 py-3 text-left text-sm font-bold uppercase tracking-wider ${SECTION_COLORS[section]}`}
+                                        >
+                                            {SECTION_LABELS[section]}
+                                        </th>
+                                    ))}
+                                </tr>
+
+                                {/* Column Headers */}
+                                <tr className="bg-gray-100 border-b border-gray-300">
+                                    {COLUMNS.map(col => (
+                                        <th
+                                            key={col.key}
+                                            className={`px-2 py-3 text-left text-xs font-bold text-gray-800 uppercase tracking-wider border-r border-gray-300 ${col.frozen ? 'sticky left-0 bg-gray-100 z-10' : ''
+                                                }`}
+                                            style={{ width: col.width, minWidth: col.width }}
+                                        >
+                                            {col.label}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+
+                            {/* Data Rows */}
+                            <tbody className="divide-y divide-gray-200">
+                                {wipData.map((job) => (
+                                    <tr key={job.id} className="hover:bg-gray-50">
+                                        {COLUMNS.map(col => (
+                                            <td
+                                                key={`${job.id}-${col.key}`}
+                                                className={`${col.frozen ? 'sticky left-0 bg-white hover:bg-gray-50 z-10 border-r border-gray-300' : ''}`}
+                                                style={{ width: col.width, minWidth: col.width }}
+                                            >
+                                                {col.key === 'job_number' || col.key === 'project_name' ? (
+                                                    <div className="p-2 text-sm font-medium text-gray-900 border-r border-gray-200">
+                                                        {job[col.key]}
+                                                    </div>
+                                                ) : (
+                                                    <TableCell
+                                                        value={job[col.key]}
+                                                        type={col.type}
+                                                        jobNumber={job.job_number}
+                                                        field={col.key}
+                                                        hasComment={getComment(job.id, col.key)}
+                                                        onAddComment={handleAddComment}
+                                                    />
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="text-center">
+                            <p className="text-sm font-medium text-gray-600">Total Projects</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">{wipData.length}</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="text-center">
+                            <p className="text-sm font-medium text-gray-600">Total Contract Value</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">
+                                {formatCurrency(
+                                    wipData.reduce((sum, job) => sum + (job.current_month_total_contract_amount || 0), 0)
+                                )}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="text-center">
+                            <p className="text-sm font-medium text-gray-600">Total Costs to Date</p>
+                            <p className="text-3xl font-bold text-gray-900 mt-2">
+                                {formatCurrency(
+                                    wipData.reduce((sum, job) => sum + (job.current_month_cost_to_date || 0), 0)
+                                )}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="text-center mt-8 text-gray-500">
+                    <p>Professional WIP Reporting • Clear, organized, and actionable</p>
+                </div>
+            </div>
+
+            {/* Comment Modal */}
+            <CommentModal
+                isOpen={commentModal.isOpen}
+                onClose={() => setCommentModal(prev => ({ ...prev, isOpen: false }))}
+                jobNumber={commentModal.jobNumber}
+                fieldLabel={FIELD_LABELS[commentModal.field] || commentModal.field}
+                fieldValue={commentModal.value}
+                existingComment={commentModal.existingComment}
+                onSave={handleSaveComment}
+            />
+        </div>
+    );
+};
