@@ -1,47 +1,31 @@
 import axios from 'axios';
-import { getValidToken, clearAuthData } from './TokenManager';
 
-const API_BASE = 'http://localhost:8000';
+// API Configuration - use direct backend URL for local development
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? '/api'  // Use proxy in production
+    : 'http://localhost:8000';  // Direct backend URL in development
 
 // Create axios instance
 export const apiClient = axios.create({
-    baseURL: API_BASE,
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-// Auth token management
-export const setAuthToken = (token: string | null) => {
-    if (token) {
-        apiClient.defaults.headers.Authorization = `Bearer ${token}`;
-    } else {
-        delete apiClient.defaults.headers.Authorization;
-    }
-};
-
-// Initialize auth token on app load
-const validToken = getValidToken();
-if (validToken) {
-    setAuthToken(validToken);
+// Rest of your existing types and code stays the same...
+export interface User {
+    id: number;
+    username: string;
+    email: string;
+    role: 'admin' | 'viewer';
+    first_name?: string;
+    last_name?: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
-// Add response interceptor to handle token expiration
-apiClient.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid
-            clearAuthData();
-            delete apiClient.defaults.headers.Authorization;
-            // Redirect to login by reloading the app
-            window.location.reload();
-        }
-        return Promise.reject(error);
-    }
-);
-
-// Types
 export interface LoginRequest {
     username: string;
     password: string;
@@ -52,22 +36,17 @@ export interface LoginResponse {
     token_type: string;
     user_id: number;
     username: string;
-    role: string;
-}
-
-export interface User {
-    id: number;
-    username: string;
-    role: string;
-    is_active: boolean;
+    role: 'admin' | 'viewer';
 }
 
 export interface Project {
     id: number;
     job_number: string;
     name: string;
-    original_contract_amount: number;
+    original_contract_amount?: number;
     is_active: boolean;
+    created_at: string;
+    updated_at: string;
     total_wip_snapshots?: number;
     latest_report_date?: string;
 }
@@ -75,25 +54,29 @@ export interface Project {
 export interface WIPSnapshot {
     id: number;
     project_id: number;
-    project_name: string;
-    report_date: string;
     job_number: string;
+    project_name?: string;
+    report_date: string;
 
-    // Contract fields
+    // Input fields
     current_month_original_contract_amount?: number;
     current_month_change_order_amount?: number;
+    current_month_cost_to_date?: number;
+    current_month_estimated_cost_to_complete?: number;
+    current_month_revenue_billed_to_date?: number;
+    current_month_addl_entry_required?: number;
+
+    // Calculated contract fields
     current_month_total_contract_amount?: number;
     prior_month_total_contract_amount?: number;
     current_vs_prior_contract_variance?: number;
 
-    // Cost fields
-    current_month_cost_to_date?: number;
-    current_month_estimated_cost_to_complete?: number;
+    // Calculated cost fields
     current_month_estimated_final_cost?: number;
     prior_month_estimated_final_cost?: number;
     current_vs_prior_estimated_final_cost_variance?: number;
 
-    // US GAAP fields
+    // Calculated US GAAP fields
     us_gaap_percent_completion?: number;
     revenue_earned_to_date_us_gaap?: number;
     estimated_job_margin_to_date_us_gaap?: number;
@@ -105,15 +88,23 @@ export interface WIPSnapshot {
     current_vs_prior_estimated_job_margin?: number;
     current_month_estimated_job_margin_percent_sales?: number;
 
-    // Billing fields
-    current_month_revenue_billed_to_date?: number;
-
-    // WIP adjustments
+    // Calculated WIP adjustments
     current_month_costs_in_excess_billings?: number;
     current_month_billings_excess_revenue?: number;
-    current_month_addl_entry_required?: number;
 }
 
+export interface WIPDashboardSummary {
+    total_projects: number;
+    total_contract_value: number;
+    total_cost_to_date: number;
+    total_billed_to_date: number;
+    total_estimated_final_cost: number;
+    overall_margin: number;
+    overall_margin_percent: number;
+    report_date: string;
+}
+
+// NEW: WIP Totals interfaces
 export interface WIPTotals {
     // Contract section
     total_original_contract: number;
@@ -157,6 +148,25 @@ export interface WIPWithTotalsResponse {
     report_date: string | null;
 }
 
+// Auth token management - FIXED to use access_token
+let authToken: string | null = localStorage.getItem('access_token');
+
+export const setAuthToken = (token: string | null) => {
+    authToken = token;
+    if (token) {
+        localStorage.setItem('access_token', token);
+        apiClient.defaults.headers.Authorization = `Bearer ${token}`;
+    } else {
+        localStorage.removeItem('access_token');
+        delete apiClient.defaults.headers.Authorization;
+    }
+};
+
+// Initialize auth token on app load
+if (authToken) {
+    apiClient.defaults.headers.Authorization = `Bearer ${authToken}`;
+}
+
 // API Functions
 export const authAPI = {
     login: async (credentials: LoginRequest): Promise<LoginResponse> => {
@@ -168,7 +178,6 @@ export const authAPI = {
 
     logout: () => {
         setAuthToken(null);
-        clearAuthData();
     },
 
     verifyToken: async (): Promise<{ valid: boolean; user: User }> => {
@@ -205,17 +214,60 @@ export const wipAPI = {
         return response.data;
     },
 
+    // ADD THIS NEW METHOD:
     update: async (wipId: number, updateData: Partial<WIPSnapshot>): Promise<WIPSnapshot> => {
         const response = await apiClient.put(`/wip/${wipId}`, updateData);
         return response.data;
     },
 
-    create: async (wipData: Partial<WIPSnapshot>): Promise<WIPSnapshot> => {
-        const response = await apiClient.post('/wip/', wipData);
+    get: async (id: number): Promise<WIPSnapshot> => {
+        const response = await apiClient.get(`/wip/${id}`);
         return response.data;
     },
 
-    delete: async (wipId: number): Promise<void> => {
-        await apiClient.delete(`/wip/${wipId}`);
-    }
+    dashboardSummary: async (): Promise<WIPDashboardSummary> => {
+        const response = await apiClient.get('/wip/summary/dashboard');
+        return response.data;
+    },
+};
+
+export const usersAPI = {
+    me: async (): Promise<User> => {
+        const response = await apiClient.get('/users/me');
+        return response.data;
+    },
+};
+
+// Utility functions
+export const formatCurrency = (amount: number | null | undefined): string => {
+    if (amount === null || amount === undefined) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(amount);
+};
+
+export const formatPercent = (percent: number | null | undefined): string => {
+    if (percent === null || percent === undefined) return 'N/A';
+    return `${percent.toFixed(1)}%`;
+};
+
+export const getChangeIndicator = (current: number | null | undefined, previous: number | null | undefined) => {
+    if (!current || !previous || current === previous) return null;
+
+    const change = ((current - previous) / previous) * 100;
+    return {
+        value: Math.abs(change),
+        isIncrease: change > 0,
+        isDecrease: change < 0,
+    };
+};
+
+// NEW: Utility function for variance styling
+export const getVarianceClass = (variance: number): string => {
+    if (variance > 0) return 'text-green-600 font-medium';
+    if (variance < 0) return 'text-red-600 font-medium';
+    return 'text-gray-600';
 };
