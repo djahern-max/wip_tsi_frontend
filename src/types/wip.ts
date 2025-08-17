@@ -48,9 +48,18 @@ export interface CellExplanation {
     field_name: string;
     explanation: string;
     created_by: number;
-    created_by_name?: string;
+    created_by_name: string;
+    created_by_first_name?: string;  // ADD THIS
+    created_by_last_name?: string;   // ADD THIS
     created_at: string;
     updated_at: string;
+}
+
+// Add this helper interface for user info
+export interface UserInfo {
+    firstName?: string;
+    lastName?: string;
+    username?: string;
 }
 
 export interface ExplanationCreate {
@@ -83,3 +92,4 @@ export interface AuthToken {
     username: string;
     role: string;
 }
+

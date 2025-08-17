@@ -5,6 +5,7 @@ import { wipService } from '../services/wipService';
 import { wipAPI, WIPWithTotalsResponse } from '../lib/api';
 import { CommentModal } from './CommentModal';
 import WIPTotalsRow from './WIPTotalsRow';
+import { UserInitials } from '../components/userInitials';
 
 // Dynamic column generation function
 const getDynamicColumns = (reportDate: string): WIPColumn[] => {
@@ -62,11 +63,14 @@ interface EditableTableCellProps {
     isAdmin: boolean;
     onSave: (wipId: number, field: keyof WIPSnapshot, value: any) => Promise<void>;
     hasComment?: string;
+    commentExplanation?: CellExplanation;  // ADD THIS
     onAddComment: (jobNumber: string, field: keyof WIPSnapshot, value: string) => void;
 }
 
+// Replace the EditableTableCell component with this fixed version:
+
 const EditableTableCell: React.FC<EditableTableCellProps> = ({
-    value, type, jobNumber, wipId, field, isAdmin, onSave, hasComment, onAddComment
+    value, type, jobNumber, wipId, field, isAdmin, onSave, hasComment, commentExplanation, onAddComment
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState('');
@@ -95,11 +99,18 @@ const EditableTableCell: React.FC<EditableTableCellProps> = ({
 
     const formattedValue = formatValue(value, type);
 
+    // Check if field is editable
+    const isEditable = isAdmin &&
+        field !== 'job_number' &&
+        field !== 'project_name' &&
+        field !== 'current_vs_prior_contract_variance';
+
     const handleEdit = () => {
-        if (!isAdmin || field === 'job_number' || field === 'project_name' || field === 'current_vs_prior_contract_variance') return;
+        if (!isEditable) return;
         setEditValue(value?.toString() || '');
         setIsEditing(true);
     };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -138,7 +149,7 @@ const EditableTableCell: React.FC<EditableTableCellProps> = ({
     if (field === 'job_number' || field === 'project_name') {
         return (
             <div className="p-2 text-sm font-medium text-gray-900 border-r border-gray-200">
-                {field === 'job_number' ? value : value}
+                {value}
             </div>
         );
     }
@@ -175,15 +186,32 @@ const EditableTableCell: React.FC<EditableTableCellProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className={`p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50 ${isAdmin ? 'cursor-pointer' : ''}`} onClick={handleEdit}>
+                <div
+                    className={`p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50 ${isEditable ? 'cursor-pointer' : ''}`}
+                    onClick={handleEdit}
+                >
                     {formattedValue}
-                    {isAdmin && (
+                    {/* FIXED: Show edit icon only for editable fields */}
+                    {isEditable && (
                         <Edit3 size={12} className="ml-1 opacity-0 group-hover:opacity-50 text-blue-500" />
                     )}
                 </div>
             )}
 
-            {/* Comment button */}
+            {/* User initials indicator in top-left corner if there's a comment */}
+            {hasComment && commentExplanation && (
+                <div className="absolute -top-1 -left-1 z-20">
+                    <UserInitials
+                        firstName={commentExplanation.created_by_first_name}
+                        lastName={commentExplanation.created_by_last_name}
+                        username={commentExplanation.created_by_name}
+                        size="xs"
+                        className="border-2 border-white shadow-sm"
+                    />
+                </div>
+            )}
+
+            {/* Comment button - positioned in top-right */}
             <button
                 onClick={() => onAddComment(jobNumber, field, formattedValue)}
                 className={`absolute top-1 right-1 p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 ${hasComment
@@ -195,8 +223,9 @@ const EditableTableCell: React.FC<EditableTableCellProps> = ({
                 <MessageCircle size={12} />
             </button>
 
+            {/* Tooltip with comment preview */}
             {hasComment && (
-                <div className="absolute z-10 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
+                <div className="absolute z-30 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
                     {hasComment}
                 </div>
             )}
@@ -222,7 +251,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
     // Generate dynamic columns based on report date
     const columns = getDynamicColumns(reportDate);
 
-    // Comment modal state
+    // Comment modal state - UPDATED to include existingExplanation
     const [commentModal, setCommentModal] = useState<{
         isOpen: boolean;
         jobNumber: string;
@@ -231,6 +260,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
         wipSnapshotId?: number;
         existingComment?: string;
         existingCommentId?: number;
+        existingExplanation?: CellExplanation;  // ADD THIS
     }>({
         isOpen: false,
         jobNumber: '',
@@ -298,6 +328,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
         }
     };
 
+    // UPDATED to include existingExplanation
     const handleAddComment = (jobNumber: string, field: keyof WIPSnapshot, value: string) => {
         const wip = wipData.find(w => w.job_number === jobNumber);
         if (!wip) return;
@@ -312,7 +343,8 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
             value,
             wipSnapshotId: wip.id,
             existingComment: existingExplanation?.explanation,
-            existingCommentId: existingExplanation?.id
+            existingCommentId: existingExplanation?.id,
+            existingExplanation  // ADD THIS
         });
     };
 
@@ -343,6 +375,12 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
             console.error('Error saving comment:', err);
             setError('Failed to save comment');
         }
+    };
+
+    // ADD new function to get explanation object
+    const getCommentExplanation = (wipId: number, field: keyof WIPSnapshot): CellExplanation | undefined => {
+        const wipExplanations = explanations[wipId.toString()] || [];
+        return wipExplanations.find(exp => exp.field_name === field);
     };
 
     const getComment = (wipId: number, field: keyof WIPSnapshot): string | undefined => {
@@ -522,6 +560,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
                                                     isAdmin={isAdmin}
                                                     onSave={handleSaveCell}
                                                     hasComment={getComment(job.id, col.key)}
+                                                    commentExplanation={getCommentExplanation(job.id, col.key)}  // ADD THIS
                                                     onAddComment={handleAddComment}
                                                 />
                                             </td>
@@ -537,7 +576,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
                 </div>
             </div>
 
-            {/* Comment Modal */}
+            {/* Comment Modal - UPDATED to pass existingExplanation */}
             <CommentModal
                 isOpen={commentModal.isOpen}
                 onClose={() => setCommentModal(prev => ({ ...prev, isOpen: false }))}
@@ -545,6 +584,7 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
                 fieldLabel={commentModal.field}
                 fieldValue={commentModal.value}
                 existingComment={commentModal.existingComment}
+                existingExplanation={commentModal.existingExplanation}  // ADD THIS
                 onSave={handleSaveComment}
             />
         </div>

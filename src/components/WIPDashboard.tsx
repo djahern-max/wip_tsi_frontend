@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { WIPSnapshot, CellExplanation, WIPColumn } from '../types/wip';
 import { wipService } from '../services/wipService';
-import { wipAPI, WIPWithTotalsResponse } from '../lib/api'; // Import the new API
+import { wipAPI, WIPWithTotalsResponse } from '../lib/api';
 import { CommentModal } from './CommentModal';
-import WIPTotalsRow from './WIPTotalsRow'; // Import the totals row component
+import WIPTotalsRow from './WIPTotalsRow';
+import { UserInitials } from '../components/userInitials';
 
 // Dynamic column generation function
 const getDynamicColumns = (reportDate: string): WIPColumn[] => {
@@ -135,10 +136,19 @@ interface TableCellProps {
     jobNumber: string;
     field: keyof WIPSnapshot;
     hasComment?: string;
+    commentExplanation?: CellExplanation;  // UPDATED - full explanation object
     onAddComment: (jobNumber: string, field: keyof WIPSnapshot, value: string) => void;
 }
 
-const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, hasComment, onAddComment }) => {
+const TableCell: React.FC<TableCellProps> = ({
+    value,
+    type,
+    jobNumber,
+    field,
+    hasComment,
+    commentExplanation,  // UPDATED
+    onAddComment
+}) => {
     const formattedValue = formatValue(value, type);
 
     return (
@@ -146,6 +156,21 @@ const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, ha
             <div className="p-2 text-right font-mono text-sm border-r border-gray-200 min-h-[40px] flex items-center justify-end hover:bg-gray-50">
                 {formattedValue}
             </div>
+
+            {/* User initials indicator in top-left corner if there's a comment */}
+            {hasComment && commentExplanation && (
+                <div className="absolute -top-1 -left-1 z-20">
+                    <UserInitials
+                        firstName={commentExplanation.created_by_first_name}
+                        lastName={commentExplanation.created_by_last_name}
+                        username={commentExplanation.created_by_name}
+                        size="xs"
+                        className="border-2 border-white shadow-sm"
+                    />
+                </div>
+            )}
+
+            {/* Comment button */}
             <button
                 onClick={() => onAddComment(jobNumber, field, formattedValue)}
                 className={`absolute top-1 right-1 p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 ${hasComment
@@ -156,8 +181,10 @@ const TableCell: React.FC<TableCellProps> = ({ value, type, jobNumber, field, ha
             >
                 <MessageCircle size={12} />
             </button>
+
+            {/* Tooltip with comment preview */}
             {hasComment && (
-                <div className="absolute z-10 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
+                <div className="absolute z-30 bottom-full left-0 mb-1 p-2 bg-green-600 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none max-w-xs">
                     {hasComment}
                 </div>
             )}
@@ -181,7 +208,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
     // Generate dynamic columns based on report date
     const columns = getDynamicColumns(reportDate);
 
-    // Comment modal state
+    // Comment modal state - UPDATED to include existingExplanation
     const [commentModal, setCommentModal] = useState<{
         isOpen: boolean;
         jobNumber: string;
@@ -190,6 +217,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
         wipSnapshotId?: number;
         existingComment?: string;
         existingCommentId?: number;
+        existingExplanation?: CellExplanation;  // ADD THIS
     }>({
         isOpen: false,
         jobNumber: '',
@@ -229,7 +257,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                     const wipExplanations = await wipService.getExplanations(wip.id);
                     explanationsMap[wip.id.toString()] = wipExplanations;
                 } catch (err) {
-                    console.warn(`Failed to load explanations for WIP ${wip.id}:`, err);
+                    // Silently fail for missing explanations
                 }
             }
             setExplanations(explanationsMap);
@@ -251,6 +279,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
         }
     };
 
+    // UPDATED to include existingExplanation
     const handleAddComment = (jobNumber: string, field: keyof WIPSnapshot, value: string) => {
         const wip = wipData.find(w => w.job_number === jobNumber);
         if (!wip) return;
@@ -265,7 +294,8 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
             value,
             wipSnapshotId: wip.id,
             existingComment: existingExplanation?.explanation,
-            existingCommentId: existingExplanation?.id
+            existingCommentId: existingExplanation?.id,
+            existingExplanation  // ADD THIS
         });
     };
 
@@ -299,6 +329,12 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
             console.error('Error saving comment:', err);
             setError('Failed to save comment');
         }
+    };
+
+    // ADD new function to get explanation object
+    const getCommentExplanation = (wipId: number, field: keyof WIPSnapshot): CellExplanation | undefined => {
+        const wipExplanations = explanations[wipId.toString()] || [];
+        return wipExplanations.find(exp => exp.field_name === field);
     };
 
     const getComment = (wipId: number, field: keyof WIPSnapshot): string | undefined => {
@@ -452,6 +488,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                                                         jobNumber={job.job_number}
                                                         field={col.key}
                                                         hasComment={getComment(job.id, col.key)}
+                                                        commentExplanation={getCommentExplanation(job.id, col.key)}  // ADD THIS
                                                         onAddComment={handleAddComment}
                                                     />
                                                 )}
@@ -468,7 +505,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                 </div>
             </div>
 
-            {/* Comment Modal */}
+            {/* Comment Modal - UPDATED to pass existingExplanation */}
             <CommentModal
                 isOpen={commentModal.isOpen}
                 onClose={() => setCommentModal(prev => ({ ...prev, isOpen: false }))}
@@ -476,6 +513,7 @@ export const WIPDashboard: React.FC<WIPDashboardProps> = ({ onReportDateUpdate }
                 fieldLabel={FIELD_LABELS[commentModal.field] || commentModal.field}
                 fieldValue={commentModal.value}
                 existingComment={commentModal.existingComment}
+                existingExplanation={commentModal.existingExplanation}  // ADD THIS
                 onSave={handleSaveComment}
             />
         </div>
