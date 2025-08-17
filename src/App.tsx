@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
-import { EditableWIPDashboard } from './components/EditableWIPDashboard'; // Changed import
+import { EditableWIPDashboard } from './components/EditableWIPDashboard';
 import { Header } from './components/Header';
 import { wipService } from './services/wipService';
+import { getValidToken, clearAuthData, setAuthData, getStoredUser } from './lib/TokenManager';
 
 interface User {
   username: string;
@@ -16,21 +17,24 @@ function App() {
   const [dashboardKey, setDashboardKey] = useState(0);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const token = localStorage.getItem('access_token');
+    // Check if user has a valid (non-expired) token
+    const token = getValidToken();
     if (token) {
       setIsAuthenticated(true);
-      const storedUser = localStorage.getItem('user');
+      const storedUser = getStoredUser();
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        setUser(storedUser);
       }
+    } else {
+      // Token was expired or invalid, ensure we're logged out
+      setIsAuthenticated(false);
+      setUser(null);
     }
     setIsLoading(false);
   }, []);
 
   const handleLoginSuccess = (token: string, userData: { username: string; role: string }) => {
-    localStorage.setItem('access_token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    setAuthData(token, userData);
 
     setUser({
       username: userData.username,
@@ -40,8 +44,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    clearAuthData();
     setIsAuthenticated(false);
     setUser(null);
   };
@@ -85,7 +88,7 @@ function App() {
       {/* Editable WIP Dashboard */}
       <EditableWIPDashboard
         key={dashboardKey}
-        currentUser={user} // Pass the current user
+        currentUser={user}
       />
     </div>
   );
