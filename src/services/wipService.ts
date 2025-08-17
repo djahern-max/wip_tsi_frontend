@@ -53,7 +53,7 @@ class WIPService {
 
     // Explanation endpoints
     async getExplanations(wipSnapshotId: number): Promise<CellExplanation[]> {
-        const response = await fetch(`${API_BASE}/wip/snapshots/${wipSnapshotId}/explanations`, {
+        const response = await fetch(`${API_BASE}/explanations/wip/${wipSnapshotId}`, {
             headers: this.getAuthHeaders()
         });
 
@@ -64,42 +64,52 @@ class WIPService {
         return response.json();
     }
 
+
     async createExplanation(wipSnapshotId: number, explanation: ExplanationCreate): Promise<CellExplanation> {
-        const response = await fetch(`${API_BASE}/wip/snapshots/${wipSnapshotId}/explanations`, {
+        const response = await fetch(`${API_BASE}/explanations/wip/${wipSnapshotId}`, {
             method: 'POST',
-            headers: this.getAuthHeaders(),
+            headers: {
+                ...this.getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(explanation)
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to create explanation: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Failed to create explanation: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         return response.json();
     }
 
     async updateExplanation(wipSnapshotId: number, explanationId: number, explanation: ExplanationUpdate): Promise<CellExplanation> {
-        const response = await fetch(`${API_BASE}/wip/snapshots/${wipSnapshotId}/explanations/${explanationId}`, {
-            method: 'PATCH',
-            headers: this.getAuthHeaders(),
+        const response = await fetch(`${API_BASE}/explanations/${explanationId}`, {
+            method: 'PUT',
+            headers: {
+                ...this.getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(explanation)
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to update explanation: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Failed to update explanation: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         return response.json();
     }
 
-    async deleteExplanation(wipSnapshotId: number, explanationId: number): Promise<void> {
-        const response = await fetch(`${API_BASE}/wip/snapshots/${wipSnapshotId}/explanations/${explanationId}`, {
+    async deleteExplanation(explanationId: number): Promise<void> {
+        const response = await fetch(`${API_BASE}/explanations/${explanationId}`, {
             method: 'DELETE',
             headers: this.getAuthHeaders()
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to delete explanation: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Failed to delete explanation: ${response.status} ${response.statusText} - ${errorText}`);
         }
     }
 

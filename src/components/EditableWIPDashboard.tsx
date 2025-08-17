@@ -96,7 +96,7 @@ const EditableTableCell: React.FC<EditableTableCellProps> = ({
     const formattedValue = formatValue(value, type);
 
     const handleEdit = () => {
-        if (!isAdmin || field === 'job_number' || field === 'project_name') return;
+        if (!isAdmin || field === 'job_number' || field === 'project_name' || field === 'current_vs_prior_contract_variance') return;
         setEditValue(value?.toString() || '');
         setIsEditing(true);
     };
@@ -259,14 +259,14 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
                 }
             }
 
-            // Load explanations
+            // Load explanations without spamming console
             const explanationsMap: Record<string, CellExplanation[]> = {};
             for (const wip of response.snapshots) {
                 try {
                     const wipExplanations = await wipService.getExplanations(wip.id);
                     explanationsMap[wip.id.toString()] = wipExplanations;
                 } catch (err) {
-                    console.warn(`Failed to load explanations for WIP ${wip.id}:`, err);
+                    // Silently fail for missing explanations
                 }
             }
             setExplanations(explanationsMap);
@@ -280,13 +280,18 @@ export const EditableWIPDashboard: React.FC<EditableWIPDashboardProps> = ({ onRe
 
     const handleSaveCell = async (wipId: number, field: keyof WIPSnapshot, value: any) => {
         try {
-            // Call API to update the specific field
             const updateData: Partial<WIPSnapshot> = { [field]: value } as Partial<WIPSnapshot>;
-            await wipAPI.update(wipId, updateData);
+            const updatedWip = await wipAPI.update(wipId, updateData);
 
-            // Reload data to get updated totals
+            // Update the specific record in state with calculated values
+            setWipData(prevData =>
+                prevData.map(wip =>
+                    wip.id === wipId ? { ...wip, ...updatedWip } : wip
+                )
+            );
+
+            // Reload to get updated totals
             await loadWIPData();
-
         } catch (error) {
             console.error('Error updating cell:', error);
             throw error;
